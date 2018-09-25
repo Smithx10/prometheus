@@ -26,6 +26,7 @@ import (
 	"github.com/mwitkow/go-conntrack"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
+	"github.com/y0ssar1an/q"
 
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
@@ -210,6 +211,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 
 	dr := DiscoveryResponse{}
 	err = json.Unmarshal(data, &dr)
+	q.Q(dr)
 	if err != nil {
 		return tg, fmt.Errorf("an error occurred unmarshaling the disovery response json. %s", err)
 	}
@@ -228,6 +230,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 		}
 		labels[model.AddressLabel] = model.LabelValue(addr)
 		tg.Targets = append(tg.Targets, labels)
+		q.Q(tg.Targets)
 	}
 
 	return tg, nil
