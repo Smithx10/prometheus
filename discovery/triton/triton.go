@@ -219,18 +219,29 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 		return tg, fmt.Errorf("an error occurred unmarshaling the disovery response json. %s", err)
 	}
 
-	for _, container := range dr.Containers {
-		labels := model.LabelSet{
-			tritonLabelMachineID:    model.LabelValue(container.VMUUID),
-			tritonLabelMachineAlias: model.LabelValue(container.VMAlias),
-			tritonLabelMachineBrand: model.LabelValue(container.VMBrand),
-			tritonLabelMachineImage: model.LabelValue(container.VMImageUUID),
-			tritonLabelServerID:     model.LabelValue(container.ServerUUID),
+	if d.sdConfig.GZ == true {
+		for _, cns := range dr.CNS {
+			labels := model.LabelSet{
+				tritonLabelServerID: model.LabelValue(cns.ServerUUID),
+			}
+			addr := fmt.Sprintf("%s.%s:%d", container.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+			labels[model.AddressLabel] = model.LabelValue(addr)
+			tg.Targets = append(tg.Targets, labels)
 		}
-		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
-		labels[model.AddressLabel] = model.LabelValue(addr)
-		tg.Targets = append(tg.Targets, labels)
-		q.Q(tg.Targets)
+	}
+	if d.sdConfig.GZ == false {
+		for _, container := range dr.Containers {
+			labels := model.LabelSet{
+				tritonLabelMachineID:    model.LabelValue(container.VMUUID),
+				tritonLabelMachineAlias: model.LabelValue(container.VMAlias),
+				tritonLabelMachineBrand: model.LabelValue(container.VMBrand),
+				tritonLabelMachineImage: model.LabelValue(container.VMImageUUID),
+				tritonLabelServerID:     model.LabelValue(container.ServerUUID),
+			}
+			addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+			labels[model.AddressLabel] = model.LabelValue(addr)
+			tg.Targets = append(tg.Targets, labels)
+		}
 	}
 
 	return tg, nil
