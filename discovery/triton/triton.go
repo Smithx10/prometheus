@@ -103,11 +103,6 @@ func init() {
 }
 
 // DiscoveryResponse models a JSON response from the Triton discovery.
-type GzDiscoveryResponse struct {
-	CNS []struct {
-		ServerUUID string `json:"server_uuid"`
-	} `json:"cns"`
-}
 type DiscoveryResponse struct {
 	Containers []struct {
 		ServerUUID  string `json:"server_uuid"`
@@ -116,6 +111,9 @@ type DiscoveryResponse struct {
 		VMImageUUID string `json:"vm_image_uuid"`
 		VMUUID      string `json:"vm_uuid"`
 	} `json:"containers"`
+	CNS []struct {
+		ServerUUID string `json:"server_uuid"`
+	} `json:"cns"`
 }
 
 // Discovery periodically performs Triton-SD requests. It implements
@@ -215,9 +213,8 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	}
 
 	dr := DiscoveryResponse{}
-	gzr := GzDiscoveryResponse{}
-	err = json.Unmarshal(data, &gzr)
-	q.Q(gzr)
+	err = json.Unmarshal(data, &dr)
+	q.Q(dr)
 	if err != nil {
 		return tg, fmt.Errorf("an error occurred unmarshaling the disovery response json. %s", err)
 	}
@@ -231,9 +228,6 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 			tritonLabelServerID:     model.LabelValue(container.ServerUUID),
 		}
 		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
-		if d.sdConfig.GZ == true {
-			addr = fmt.Sprintf("%s.%s:%d", container.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
-		}
 		labels[model.AddressLabel] = model.LabelValue(addr)
 		tg.Targets = append(tg.Targets, labels)
 		q.Q(tg.Targets)
