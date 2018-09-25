@@ -196,6 +196,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	tg = &targetgroup.Group{
 		Source: endpoint,
 	}
+	q.Q(tg)
 
 	resp, err := d.client.Get(endpoint)
 	if err != nil {
@@ -210,6 +211,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	}
 
 	dr := DiscoveryResponse{}
+	q.Q(dr)
 	err = json.Unmarshal(data, &dr)
 	q.Q(dr)
 	if err != nil {
