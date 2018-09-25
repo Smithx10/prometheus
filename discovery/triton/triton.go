@@ -110,7 +110,7 @@ type DiscoveryResponse struct {
 		VMImageUUID string `json:"vm_image_uuid"`
 		VMUUID      string `json:"vm_uuid"`
 	} `json:"containers"`
-	CNS []struct {
+	CNs []struct {
 		ServerUUID string `json:"server_uuid"`
 	} `json:"cns"`
 }
@@ -218,7 +218,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	}
 
 	if d.sdConfig.GZ == true {
-		for _, cns := range dr.CNS {
+		for _, cns := range dr.CNs {
 			labels := model.LabelSet{
 				tritonLabelServerID: model.LabelValue(cns.ServerUUID),
 			}
