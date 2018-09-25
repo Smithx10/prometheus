@@ -54,6 +54,7 @@ var (
 		})
 	// DefaultSDConfig is the default Triton SD configuration.
 	DefaultSDConfig = SDConfig{
+		GZ:              false,
 		Port:            9163,
 		RefreshInterval: model.Duration(60 * time.Second),
 		Version:         1,
@@ -64,6 +65,7 @@ var (
 type SDConfig struct {
 	Account         string                `yaml:"account"`
 	DNSSuffix       string                `yaml:"dns_suffix"`
+	GZ              bool                  `yaml:"gz"`
 	Endpoint        string                `yaml:"endpoint"`
 	Port            int                   `yaml:"port"`
 	RefreshInterval model.Duration        `yaml:"refresh_interval,omitempty"`
@@ -187,6 +189,9 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	}()
 
 	var endpoint = fmt.Sprintf("https://%s:%d/v%d/discover", d.sdConfig.Endpoint, d.sdConfig.Port, d.sdConfig.Version)
+	if d.sdConfig.GZ == true {
+		endpoint = fmt.Sprintf("https://%s:%d/v%d/gz/discover", d.sdConfig.Endpoint, d.sdConfig.Port, d.sdConfig.Version)
+	}
 	tg = &targetgroup.Group{
 		Source: endpoint,
 	}
@@ -218,6 +223,9 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 			tritonLabelServerID:     model.LabelValue(container.ServerUUID),
 		}
 		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+		if d.sdConfig.GZ == true {
+			addr = fmt.Sprintf("%s.%s:%d", container.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+		}
 		labels[model.AddressLabel] = model.LabelValue(addr)
 		tg.Targets = append(tg.Targets, labels)
 	}
