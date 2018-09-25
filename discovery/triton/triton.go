@@ -224,7 +224,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 			labels := model.LabelSet{
 				tritonLabelServerID: model.LabelValue(cns.ServerUUID),
 			}
-			addr := fmt.Sprintf("%s.%s:%d", container.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+			addr := fmt.Sprintf("%s.%s:%d", cns.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
 			labels[model.AddressLabel] = model.LabelValue(addr)
 			tg.Targets = append(tg.Targets, labels)
 		}
