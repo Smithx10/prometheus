@@ -199,6 +199,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	q.Q(tg)
 
 	resp, err := d.client.Get(endpoint)
+	q.Q(resp)
 	if err != nil {
 		return tg, fmt.Errorf("an error occurred when requesting targets from the discovery endpoint. %s", err)
 	}
@@ -206,6 +207,7 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
+	q.Q(data)
 	if err != nil {
 		return tg, fmt.Errorf("an error occurred when reading the response body. %s", err)
 	}
