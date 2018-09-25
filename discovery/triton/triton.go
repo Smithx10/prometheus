@@ -103,6 +103,11 @@ func init() {
 }
 
 // DiscoveryResponse models a JSON response from the Triton discovery.
+type GzDiscoveryResponse struct {
+	CNS []struct {
+		ServerUUID string `json:"server_uuid"`
+	} `json:"cns"`
+}
 type DiscoveryResponse struct {
 	Containers []struct {
 		ServerUUID  string `json:"server_uuid"`
@@ -196,10 +201,8 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	tg = &targetgroup.Group{
 		Source: endpoint,
 	}
-	q.Q(tg)
 
 	resp, err := d.client.Get(endpoint)
-	q.Q(resp)
 	if err != nil {
 		return tg, fmt.Errorf("an error occurred when requesting targets from the discovery endpoint. %s", err)
 	}
@@ -207,15 +210,14 @@ func (d *Discovery) refresh() (tg *targetgroup.Group, err error) {
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
-	q.Q(data)
 	if err != nil {
 		return tg, fmt.Errorf("an error occurred when reading the response body. %s", err)
 	}
 
 	dr := DiscoveryResponse{}
-	q.Q(dr)
-	err = json.Unmarshal(data, &dr)
-	q.Q(dr)
+	gzr := GzDiscoveryResponse{}
+	err = json.Unmarshal(data, &gzr)
+	q.Q(gzr)
 	if err != nil {
 		return tg, fmt.Errorf("an error occurred unmarshaling the disovery response json. %s", err)
 	}
