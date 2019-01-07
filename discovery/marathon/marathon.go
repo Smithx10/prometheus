@@ -463,7 +463,9 @@ func targetsForApp(app *App, external bool) []model.LabelSet {
 		// Ports can only be gathered from the Task (not from the app) and are guaranteed
 		// to be the same across all tasks. If we haven't gathered any ports by now,
 		// use the task's ports as the port list.
-		if len(ports) == 0 && len(t.Ports) != 0 {
+		if external == true {
+			ports = t.Ports
+		} else if len(ports) == 0 && len(t.Ports) != 0 {
 			ports = t.Ports
 		}
 
