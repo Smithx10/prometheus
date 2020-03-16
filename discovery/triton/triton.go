@@ -38,6 +38,7 @@ const (
 	tritonLabel             = model.MetaLabelPrefix + "triton_"
 	tritonLabelGroups       = tritonLabel + "groups"
 	tritonLabelMachineID    = tritonLabel + "machine_id"
+	tritonLabelOwnerID      = tritonLabel + "owner_id"
 	tritonLabelMachineAlias = tritonLabel + "machine_alias"
 	tritonLabelMachineBrand = tritonLabel + "machine_brand"
 	tritonLabelMachineImage = tritonLabel + "machine_image"
@@ -46,6 +47,7 @@ const (
 
 // DefaultSDConfig is the default Triton SD configuration.
 var DefaultSDConfig = SDConfig{
+	GZ:              false,
 	Port:            9163,
 	RefreshInterval: model.Duration(60 * time.Second),
 	Version:         1,
@@ -55,6 +57,8 @@ var DefaultSDConfig = SDConfig{
 type SDConfig struct {
 	Account         string                `yaml:"account"`
 	DNSSuffix       string                `yaml:"dns_suffix"`
+	GZ              bool                  `yaml:"gz"`
+	AllAccounts     bool                  `yaml:"all_accounts"`
 	Endpoint        string                `yaml:"endpoint"`
 	Groups          []string              `yaml:"groups,omitempty"`
 	Port            int                   `yaml:"port"`
@@ -95,7 +99,11 @@ type discoveryResponse struct {
 		VMBrand     string   `json:"vm_brand"`
 		VMImageUUID string   `json:"vm_image_uuid"`
 		VMUUID      string   `json:"vm_uuid"`
+		OWNERUUID   string   `json:"vm_owner_uuid"`
 	} `json:"containers"`
+	CNs []struct {
+		ServerUUID string `json:"server_uuid"`
+	} `json:"cns"`
 }
 
 // Discovery periodically performs Triton-SD requests. It implements
@@ -139,6 +147,12 @@ func New(logger log.Logger, conf *SDConfig) (*Discovery, error) {
 
 func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	var endpoint = fmt.Sprintf("https://%s:%d/v%d/discover", d.sdConfig.Endpoint, d.sdConfig.Port, d.sdConfig.Version)
+	if d.sdConfig.AllAccounts == true {
+		endpoint = fmt.Sprintf("https://%s:%d/v%d/discover?all=true", d.sdConfig.Endpoint, d.sdConfig.Port, d.sdConfig.Version)
+	}
+	if d.sdConfig.GZ == true {
+		endpoint = fmt.Sprintf("https://%s:%d/v%d/gz/discover", d.sdConfig.Endpoint, d.sdConfig.Port, d.sdConfig.Version)
+	}
 	if len(d.sdConfig.Groups) > 0 {
 		groups := url.QueryEscape(strings.Join(d.sdConfig.Groups, ","))
 		endpoint = fmt.Sprintf("%s?groups=%s", endpoint, groups)
@@ -174,23 +188,35 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 		return nil, errors.Wrap(err, "an error occurred unmarshaling the discovery response json")
 	}
 
-	for _, container := range dr.Containers {
-		labels := model.LabelSet{
-			tritonLabelMachineID:    model.LabelValue(container.VMUUID),
-			tritonLabelMachineAlias: model.LabelValue(container.VMAlias),
-			tritonLabelMachineBrand: model.LabelValue(container.VMBrand),
-			tritonLabelMachineImage: model.LabelValue(container.VMImageUUID),
-			tritonLabelServerID:     model.LabelValue(container.ServerUUID),
+	if d.sdConfig.GZ == true {
+		for _, cns := range dr.CNs {
+			labels := model.LabelSet{
+				tritonLabelServerID: model.LabelValue(cns.ServerUUID),
+			}
+			addr := fmt.Sprintf("%s.%s:%d", cns.ServerUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+			labels[model.AddressLabel] = model.LabelValue(addr)
+			tg.Targets = append(tg.Targets, labels)
 		}
-		addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
-		labels[model.AddressLabel] = model.LabelValue(addr)
+	} else {
+		for _, container := range dr.Containers {
+			labels := model.LabelSet{
+				tritonLabelMachineID:    model.LabelValue(container.VMUUID),
+				tritonLabelOwnerID:      model.LabelValue(container.OWNERUUID),
+				tritonLabelMachineAlias: model.LabelValue(container.VMAlias),
+				tritonLabelMachineBrand: model.LabelValue(container.VMBrand),
+				tritonLabelMachineImage: model.LabelValue(container.VMImageUUID),
+				tritonLabelServerID:     model.LabelValue(container.ServerUUID),
+			}
+			addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
+			labels[model.AddressLabel] = model.LabelValue(addr)
 
-		if len(container.Groups) > 0 {
-			name := "," + strings.Join(container.Groups, ",") + ","
-			labels[tritonLabelGroups] = model.LabelValue(name)
+			if len(container.Groups) > 0 {
+				name := "," + strings.Join(container.Groups, ",") + ","
+				labels[tritonLabelGroups] = model.LabelValue(name)
+			}
+
+			tg.Targets = append(tg.Targets, labels)
 		}
-
-		tg.Targets = append(tg.Targets, labels)
 	}
 
 	return []*targetgroup.Group{tg}, nil
