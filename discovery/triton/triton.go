@@ -32,17 +32,26 @@ import (
 
 	"github.com/prometheus/prometheus/discovery/refresh"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
+	"github.com/prometheus/prometheus/util/strutil"
 )
 
 const (
-	tritonLabel             = model.MetaLabelPrefix + "triton_"
-	tritonLabelGroups       = tritonLabel + "groups"
-	tritonLabelMachineID    = tritonLabel + "machine_id"
-	tritonLabelOwnerID      = tritonLabel + "owner_id"
-	tritonLabelMachineAlias = tritonLabel + "machine_alias"
-	tritonLabelMachineBrand = tritonLabel + "machine_brand"
-	tritonLabelMachineImage = tritonLabel + "machine_image"
-	tritonLabelServerID     = tritonLabel + "server_id"
+	tritonLabel               = model.MetaLabelPrefix + "triton_"
+	tritonLabelGroups         = tritonLabel + "groups"
+	tritonLabelTags           = tritonLabel + "machine_tags_"
+	tritonLabelPlatformBuild  = tritonLabel + "machine_platform_buildstamp"
+	tritonLabelMetadata       = tritonLabel + "machine_metadata_"
+	tritonLabelAutoboot       = tritonLabel + "machine_autoboot"
+	tritonLabelCreatedTS      = tritonLabel + "machine_create_timestamp"
+	tritonLabelLastModifiedTS = tritonLabel + "machine_last_modified"
+	tritonLabelState          = tritonLabel + "machine_state"
+	tritonLabelBillingId      = tritonLabel + "machine_billing_id"
+	tritonLabelMachineAlias   = tritonLabel + "machine_alias"
+	tritonLabelMachineBrand   = tritonLabel + "machine_brand"
+	tritonLabelMachineID      = tritonLabel + "machine_id"
+	tritonLabelMachineImage   = tritonLabel + "machine_image"
+	tritonLabelOwnerID        = tritonLabel + "owner_id"
+	tritonLabelServerID       = tritonLabel + "server_id"
 )
 
 // DefaultSDConfig is the default Triton SD configuration.
@@ -93,13 +102,21 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // DiscoveryResponse models a JSON response from the Triton discovery.
 type discoveryResponse struct {
 	Containers []struct {
-		Groups      []string `json:"groups"`
-		ServerUUID  string   `json:"server_uuid"`
-		VMAlias     string   `json:"vm_alias"`
-		VMBrand     string   `json:"vm_brand"`
-		VMImageUUID string   `json:"vm_image_uuid"`
-		VMUUID      string   `json:"vm_uuid"`
-		OWNERUUID   string   `json:"vm_owner_uuid"`
+		Groups           []string          `json:"groups"`
+		ServerUUID       string            `json:"server_uuid"`
+		VMAlias          string            `json:"vm_alias"`
+		VMBrand          string            `json:"vm_brand"`
+		VMImageUUID      string            `json:"vm_image_uuid"`
+		VMUUID           string            `json:"vm_uuid"`
+		OWNERUUID        string            `json:"vm_owner_uuid"`
+		Tags             map[string]string `json:"vm_tags"`
+		BillingId        string            `json:"vm_billing_id"`
+		State            string            `json:"vm_state"`
+		LastModifiedTS   string            `json:"vm_last_modified"`
+		CreateTS         string            `json:"vm_create_timestamp"`
+		Autoboot         string            `json:"vm_autoboot"`
+		CustomerMetadata map[string]string `json:"vm_customer_metadata"`
+		PlatformBuild    string            `json:"vm_platform_buildstamp"`
 	} `json:"containers"`
 	CNs []struct {
 		ServerUUID string `json:"server_uuid"`
@@ -200,19 +217,36 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	} else {
 		for _, container := range dr.Containers {
 			labels := model.LabelSet{
-				tritonLabelMachineID:    model.LabelValue(container.VMUUID),
-				tritonLabelOwnerID:      model.LabelValue(container.OWNERUUID),
-				tritonLabelMachineAlias: model.LabelValue(container.VMAlias),
-				tritonLabelMachineBrand: model.LabelValue(container.VMBrand),
-				tritonLabelMachineImage: model.LabelValue(container.VMImageUUID),
-				tritonLabelServerID:     model.LabelValue(container.ServerUUID),
+				tritonLabelMachineID:      model.LabelValue(container.VMUUID),
+				tritonLabelOwnerID:        model.LabelValue(container.OWNERUUID),
+				tritonLabelMachineAlias:   model.LabelValue(container.VMAlias),
+				tritonLabelMachineBrand:   model.LabelValue(container.VMBrand),
+				tritonLabelMachineImage:   model.LabelValue(container.VMImageUUID),
+				tritonLabelServerID:       model.LabelValue(container.ServerUUID),
+				tritonLabelAutoboot:       model.LabelValue(container.Autoboot),
+				tritonLabelBillingId:      model.LabelValue(container.BillingId),
+				tritonLabelCreatedTS:      model.LabelValue(container.CreateTS),
+				tritonLabelLastModifiedTS: model.LabelValue(container.LastModifiedTS),
+				tritonLabelPlatformBuild:  model.LabelValue(container.PlatformBuild),
+				tritonLabelState:          model.LabelValue(container.State),
 			}
+
 			addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
 			labels[model.AddressLabel] = model.LabelValue(addr)
 
 			if len(container.Groups) > 0 {
 				name := "," + strings.Join(container.Groups, ",") + ","
 				labels[tritonLabelGroups] = model.LabelValue(name)
+			}
+
+			for k, v := range container.Tags {
+				name := strutil.SanitizeLabelName(k)
+				labels[tritonLabelTags+model.LabelName(name)] = model.LabelValue(v)
+			}
+
+			for k, v := range container.CustomerMetadata {
+				name := strutil.SanitizeLabelName(k)
+				labels[tritonLabelMetadata+model.LabelName(name)] = model.LabelValue(v)
 			}
 
 			tg.Targets = append(tg.Targets, labels)
