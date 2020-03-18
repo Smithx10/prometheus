@@ -36,22 +36,25 @@ import (
 )
 
 const (
-	tritonLabel               = model.MetaLabelPrefix + "triton_"
-	tritonLabelGroups         = tritonLabel + "groups"
-	tritonLabelTags           = tritonLabel + "machine_tags_"
-	tritonLabelPlatformBuild  = tritonLabel + "machine_platform_buildstamp"
-	tritonLabelMetadata       = tritonLabel + "machine_metadata_"
-	tritonLabelAutoboot       = tritonLabel + "machine_autoboot"
-	tritonLabelCreatedTS      = tritonLabel + "machine_create_timestamp"
-	tritonLabelLastModifiedTS = tritonLabel + "machine_last_modified"
-	tritonLabelState          = tritonLabel + "machine_state"
-	tritonLabelBillingId      = tritonLabel + "machine_billing_id"
-	tritonLabelMachineAlias   = tritonLabel + "machine_alias"
-	tritonLabelMachineBrand   = tritonLabel + "machine_brand"
-	tritonLabelMachineID      = tritonLabel + "machine_id"
-	tritonLabelMachineImage   = tritonLabel + "machine_image"
-	tritonLabelOwnerID        = tritonLabel + "owner_id"
-	tritonLabelServerID       = tritonLabel + "server_id"
+	tritonLabel                = model.MetaLabelPrefix + "triton_"
+	tritonLabelGroups          = tritonLabel + "groups"
+	tritonLabelTags            = tritonLabel + "machine_tags_"
+	tritonLabelPlatformBuild   = tritonLabel + "machine_platform_buildstamp"
+	tritonLabelMetadata        = tritonLabel + "machine_metadata_"
+	tritonLabelAutoboot        = tritonLabel + "machine_autoboot"
+	tritonLabelCreatedTS       = tritonLabel + "machine_create_timestamp"
+	tritonLabelLastModifiedTS  = tritonLabel + "machine_last_modified"
+	tritonLabelState           = tritonLabel + "machine_state"
+	tritonLabelBillingId       = tritonLabel + "machine_billing_id"
+	tritonLabelBillingName     = tritonLabel + "machine_billing_name"
+	tritonLabelMachineAlias    = tritonLabel + "machine_alias"
+	tritonLabelMachineBrand    = tritonLabel + "machine_brand"
+	tritonLabelMachineID       = tritonLabel + "machine_id"
+	tritonLabelMachineImage    = tritonLabel + "machine_image"
+	tritonLabelFirewallEnabled = tritonLabel + "machine_firewall_enabled"
+	tritonLabelOwnerID         = tritonLabel + "owner_id"
+	tritonLabelOwnerLogin      = tritonLabel + "owner_login"
+	tritonLabelServerID        = tritonLabel + "server_id"
 )
 
 // DefaultSDConfig is the default Triton SD configuration.
@@ -109,12 +112,15 @@ type discoveryResponse struct {
 		VMImageUUID      string            `json:"vm_image_uuid"`
 		VMUUID           string            `json:"vm_uuid"`
 		OWNERUUID        string            `json:"vm_owner_uuid"`
+		OWNERLOGIN       string            `json:"vm_owner_login"`
 		Tags             map[string]string `json:"vm_tags"`
 		BillingId        string            `json:"vm_billing_id"`
+		BillingName      string            `json:"vm_billing_name"`
 		State            string            `json:"vm_state"`
 		LastModifiedTS   string            `json:"vm_last_modified"`
 		CreateTS         string            `json:"vm_create_timestamp"`
 		Autoboot         string            `json:"vm_autoboot"`
+		FirewallEnabled  string            `json:"vm_firewall_enabled"`
 		CustomerMetadata map[string]string `json:"vm_customer_metadata"`
 		PlatformBuild    string            `json:"vm_platform_buildstamp"`
 	} `json:"containers"`
@@ -217,18 +223,21 @@ func (d *Discovery) refresh(ctx context.Context) ([]*targetgroup.Group, error) {
 	} else {
 		for _, container := range dr.Containers {
 			labels := model.LabelSet{
-				tritonLabelMachineID:      model.LabelValue(container.VMUUID),
-				tritonLabelOwnerID:        model.LabelValue(container.OWNERUUID),
-				tritonLabelMachineAlias:   model.LabelValue(container.VMAlias),
-				tritonLabelMachineBrand:   model.LabelValue(container.VMBrand),
-				tritonLabelMachineImage:   model.LabelValue(container.VMImageUUID),
-				tritonLabelServerID:       model.LabelValue(container.ServerUUID),
-				tritonLabelAutoboot:       model.LabelValue(container.Autoboot),
-				tritonLabelBillingId:      model.LabelValue(container.BillingId),
-				tritonLabelCreatedTS:      model.LabelValue(container.CreateTS),
-				tritonLabelLastModifiedTS: model.LabelValue(container.LastModifiedTS),
-				tritonLabelPlatformBuild:  model.LabelValue(container.PlatformBuild),
-				tritonLabelState:          model.LabelValue(container.State),
+				tritonLabelMachineID:       model.LabelValue(container.VMUUID),
+				tritonLabelOwnerID:         model.LabelValue(container.OWNERUUID),
+				tritonLabelOwnerLogin:      model.LabelValue(container.OWNERLOGIN),
+				tritonLabelMachineAlias:    model.LabelValue(container.VMAlias),
+				tritonLabelMachineBrand:    model.LabelValue(container.VMBrand),
+				tritonLabelMachineImage:    model.LabelValue(container.VMImageUUID),
+				tritonLabelServerID:        model.LabelValue(container.ServerUUID),
+				tritonLabelAutoboot:        model.LabelValue(container.Autoboot),
+				tritonLabelBillingId:       model.LabelValue(container.BillingId),
+				tritonLabelBillingName:     model.LabelValue(container.BillingName),
+				tritonLabelFirewallEnabled: model.LabelValue(container.FirewallEnabled),
+				tritonLabelCreatedTS:       model.LabelValue(container.CreateTS),
+				tritonLabelLastModifiedTS:  model.LabelValue(container.LastModifiedTS),
+				tritonLabelPlatformBuild:   model.LabelValue(container.PlatformBuild),
+				tritonLabelState:           model.LabelValue(container.State),
 			}
 
 			addr := fmt.Sprintf("%s.%s:%d", container.VMUUID, d.sdConfig.DNSSuffix, d.sdConfig.Port)
